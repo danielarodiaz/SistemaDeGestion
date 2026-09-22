@@ -1,4 +1,4 @@
-# 🍕 Gastrono-Flow (MVP) — Sistema de Pedidos y Gastos
+# 🍕 Gastro-Flow (MVP) — Sistema de Pedidos y Gastos
 
 Sistema centralizado de gestión operativa y control de gastos diseñado específicamente para locales gastronómicos pequeños y medianos (parametrizado inicialmente para pizzerías y rotiserías). 
 
