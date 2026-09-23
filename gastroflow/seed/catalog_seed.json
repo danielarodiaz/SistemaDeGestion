@@ -1,0 +1,129 @@
+{
+  "categories": [
+    {
+      "codigo": "LISTA_HORNO",
+      "nombre": "Lista para hornear"
+    },
+    {
+      "codigo": "LISTA_COMER",
+      "nombre": "Lista para comer"
+    },
+    {
+      "codigo": "PRE_PIZZAS",
+      "nombre": "Pre pizzas"
+    },
+    {
+      "codigo": "MAYORISTA",
+      "nombre": "Mayorista"
+    },
+    {
+      "codigo": "PAN_ARABE",
+      "nombre": "Pan árabe"
+    },
+    {
+      "codigo": "PIZZETAS",
+      "nombre": "Pizzetas"
+    }
+  ],
+  "products": [
+    {
+      "categoria_codigo": "LISTA_HORNO",
+      "codigo": "MUZZA_HORNO",
+      "nombre": "Muzzarella",
+      "descripcion": null,
+      "fotos": null,
+      "precio": "5500.00",
+      "unidad_venta": "PIEZA"
+    },
+    {
+      "categoria_codigo": "LISTA_HORNO",
+      "codigo": "ESPECIAL_HORNO",
+      "nombre": "Especial",
+      "descripcion": null,
+      "fotos": null,
+      "precio": "7000.00",
+      "unidad_venta": "PIEZA"
+    },
+    {
+      "categoria_codigo": "LISTA_HORNO",
+      "codigo": "CALABRESA_HORNO",
+      "nombre": "Calabresa",
+      "descripcion": null,
+      "fotos": null,
+      "precio": "7000.00",
+      "unidad_venta": "PIEZA"
+    }
+  ],
+  "promotions": [
+    {
+      "codigo": "PROMO_MUZZA_HORNO_2",
+      "nombre": "Muzzarella x2",
+      "tipo": "PRECIO_UNITARIO_POR_CANTIDAD",
+      "cantidad_minima": 2,
+      "precio_unitario_promocional": "5000.00",
+      "activa": true,
+      "productos_elegibles": [
+        "MUZZA_HORNO"
+      ]
+    },
+    {
+      "codigo": "PROMO_ESPECIAL_CALABRESA_HORNO_2",
+      "nombre": "Especial y Calabresa x2",
+      "tipo": "PRECIO_UNITARIO_POR_CANTIDAD",
+      "cantidad_minima": 2,
+      "precio_unitario_promocional": "6500.00",
+      "activa": true,
+      "productos_elegibles": [
+        "ESPECIAL_HORNO",
+        "CALABRESA_HORNO"
+      ]
+    }
+  ],
+  "wholesale_rules": [
+    {
+      "codigo": "MAYORISTA_LISTA_HORNO_10",
+      "categoria_codigo": "LISTA_HORNO",
+      "nombre": "Mayorista lista para hornear desde 10 unidades",
+      "cantidad_minima_total": 10,
+      "activa": true,
+      "product_prices": [
+        {
+          "producto_codigo": "MUZZA_HORNO",
+          "precio_unitario_mayorista": "4500.00"
+        },
+        {
+          "producto_codigo": "ESPECIAL_HORNO",
+          "precio_unitario_mayorista": "6000.00"
+        },
+        {
+          "producto_codigo": "CALABRESA_HORNO",
+          "precio_unitario_mayorista": "6000.00"
+        }
+      ]
+    }
+  ],
+  "delivery_zones": [
+    {
+      "nombre": "San Miguel de Tucuman",
+      "costo": "1500.00"
+    },
+    {
+      "nombre": "Alderetes",
+      "costo": "500.00"
+    },
+    {
+      "nombre": "Yerba Buena",
+      "costo": "2000.00"
+    }
+  ],
+  "combo_rules": [
+    {
+      "producto_a_codigo": "MUZZA_HORNO",
+      "producto_b_codigo": "ESPECIAL_HORNO",
+      "requiere_confirmacion": false,
+      "regla_precio": "PROMEDIO",
+      "precio_fijo_combo": null
+    }
+  ],
+  "pending_combos": []
+}

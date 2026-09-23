@@ -1,0 +1,46 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      APP_SECRET_KEY: ${APP_SECRET_KEY:-change-me-in-development}
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
+      REFLEX_APP_NAME: ${REFLEX_APP_NAME:-gastroflow}
+      REFLEX_FRONTEND_PORT: ${REFLEX_FRONTEND_PORT:-3000}
+      REFLEX_BACKEND_PORT: ${REFLEX_BACKEND_PORT:-8000}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-gastroflow}
+      POSTGRES_USER: ${POSTGRES_USER:-gastroflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gastroflow_dev_password}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-gastroflow}:${POSTGRES_PASSWORD:-gastroflow_dev_password}@db:5432/${POSTGRES_DB:-gastroflow}
+    ports:
+      - "${REFLEX_FRONTEND_PORT:-3000}:3000"
+      - "${REFLEX_BACKEND_PORT:-8000}:8000"
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+    command: reflex run --env dev --frontend-port 3000 --backend-port 8000 --backend-host 0.0.0.0
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-gastroflow}
+      POSTGRES_USER: ${POSTGRES_USER:-gastroflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gastroflow_dev_password}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gastroflow} -d ${POSTGRES_DB:-gastroflow}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:

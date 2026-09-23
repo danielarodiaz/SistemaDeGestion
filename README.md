@@ -44,7 +44,7 @@ El proyecto está desarrollado **100% en Python**, priorizando una arquitectura 
   * Botones de un solo toque para transición de estados sin recargar pantalla.
   * Formulario de gastos con autocompletado y creación en caliente (*on-the-fly*) de motivos y marcas.
 * **Panel de Configuración (Solo Admin):**
-  * CRUD de categorías, productos, reglas de combinación (`combo_regla`) y zonas de envío.
+  * CRUD de categorías, productos, promociones, reglas mayoristas, reglas de combinación (`combo_regla`) y zonas de envío.
 
 ---
 
@@ -52,20 +52,63 @@ El proyecto está desarrollado **100% en Python**, priorizando una arquitectura 
 
 ```text
 .
-├── alembic/                  # Entorno y scripts de migración de BD
-│   └── versions/
-├── backend/
-│   ├── database/             # Conexión engine, sesiones y secuencias
+├── gastroflow/
+│   ├── app.py                # Entrada Reflex y registro de paginas
+│   ├── domain/               # Enums, maquina de estados y errores de dominio
 │   ├── models/               # Modelos SQLModel (Base/Table/Create/Read)
-│   ├── repositories/         # Capa de acceso a datos pura
-│   └── services/             # Lógica de dominio y transacciones
-├── frontend/
-│   ├── components/           # Componentes UI reutilizables (Reflex)
-│   ├── pages/                # Vistas (Público, Cocina, Gastos, Admin)
-│   └── state/                # Clases rx.State (aisladas por módulo)
-├── tests/                    # Tests unitarios y de integración (pytest)
-├── docker-compose.yml        # Orquestación de Postgres y aplicación
-├── Dockerfile
-├── alembic.ini
-├── rxconfig.py               # Configuración de Reflex
-└── requirements.txt
+│   ├── data/                 # Sesiones, repositorios, secuencias y UoW
+│   ├── services/             # Reglas de negocio y transacciones
+│   ├── states/               # Clases rx.State aisladas por flujo
+│   ├── ui/                   # Paginas y componentes Reflex
+│   └── config/               # Settings desde variables de entorno
+├── docs/                     # Arquitectura y modelo de dominio
+├── scripts/                  # Comandos seguros de seed/admin
+└── tests/                    # Tests unitarios y de integracion
+```
+
+## 📌 Estado de entrega
+
+Fase 1 completada:
+
+* [docs/phase-1-architecture.md](docs/phase-1-architecture.md): capas, responsabilidades, flujos principales y decisiones pendientes.
+* [docs/domain-model.md](docs/domain-model.md): entidades, relaciones, enums, maquina de estados y reglas criticas.
+
+Fase 2 completada:
+
+* [docs/setup.md](docs/setup.md): Docker Compose, variables de entorno y setup local.
+* [docs/catalog-seed-required-data.md](docs/catalog-seed-required-data.md): datos confirmados para el seed inicial.
+* [gastroflow/seed/catalog_seed.json](gastroflow/seed/catalog_seed.json): seed declarativo inicial con datos confirmados.
+
+Fase 3 completada:
+
+* Modelos SQLModel en `gastroflow/models/`.
+* Configuracion Alembic en `alembic.ini` y `alembic/env.py`.
+* Primera migracion en `alembic/versions/0001_initial_schema.py`.
+
+Fase 4 completada:
+
+* Hash de passwords con bcrypt.
+* Servicio de auth y autorizacion por rol.
+* Comando seguro para crear el primer Admin.
+
+Fase 5 completada:
+
+* Servicio de pedidos con upsert de cliente por telefono.
+* Generacion atomica de codigo `PED-*` con secuencia PostgreSQL.
+* Snapshot de precios, envio y total.
+* Reglas de mayorista, promociones, combos y confirmacion.
+* Maquina de estados de pedido en dominio.
+
+Fase 6 completada:
+
+* Servicio de gastos con alta validada.
+* Creacion dinamica de motivo y marca.
+* Generacion atomica de codigo `GAS-*` con secuencia PostgreSQL.
+
+Fase 7 completada:
+
+* CRUD administrativo generico para todas las tablas del modelo.
+* Whitelist explicita de tablas administrables.
+* Manejo especial de `usuario`: password de entrada hasheada y `password_hash` nunca serializado.
+
+El proyecto debe esperar confirmacion antes de avanzar a la Fase 8.
