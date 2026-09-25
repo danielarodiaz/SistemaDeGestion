@@ -10,49 +10,87 @@ from gastroflow.states.app_state import (
     PublicOrderState,
 )
 
+GOLD = "#D19C40"
+CREAM = "#F0E9CF"
+RED = "#A90F2B"
+GREEN = "#172e1d"
+INK = "#20180f"
+LOGO_SRC = ""
 
-def shell(*children: rx.Component) -> rx.Component:
+FONT_STACK = '"Cooper Black", "Cooper BT", Georgia, serif'
+SCRIPT_STACK = '"Playlist Script", "TAN St. Canard", "Cooper BT", Georgia, serif'
+
+
+def page_bg(*children: rx.Component) -> rx.Component:
     return rx.box(
-        rx.vstack(
-            nav(),
-            rx.box(*children, width="100%", max_width="1120px", padding="1rem"),
-            spacing="4",
-            align="center",
-            width="100%",
-        ),
+        *children,
         min_height="100vh",
-        background="#f7f7f4",
-        color="#20201d",
+        background=f"linear-gradient(135deg, {CREAM} 0%, #fffaf0 42%, #f8e0aa 100%)",
+        color=INK,
+        font_family='Inter, "Segoe UI", sans-serif',
     )
 
 
-def nav() -> rx.Component:
-    link_style = {
-        "padding": "0.65rem 0.8rem",
-        "border_radius": "8px",
-        "background": "#ffffff",
-        "border": "1px solid #deded6",
-        "font_weight": "600",
-    }
+def logo_mark(size: str = "3rem") -> rx.Component:
+    return rx.cond(
+        LOGO_SRC != "",
+        rx.image(src=LOGO_SRC, width=size, height=size, border_radius="999px", object_fit="cover"),
+        rx.center(
+            rx.text("GF", font_family=FONT_STACK, font_weight="900", color=CREAM),
+            width=size,
+            height=size,
+            border_radius="999px",
+            background=GREEN,
+            border=f"2px solid {GOLD}",
+            box_shadow="0 10px 30px rgba(23, 46, 29, 0.18)",
+        ),
+    )
+
+
+def brand_block(compact: bool = False) -> rx.Component:
     return rx.hstack(
-        rx.heading("GastroFlow", size="6"),
-        rx.spacer(),
-        rx.link("Pedido", href="/", style=link_style),
-        rx.link("Login", href="/login", style=link_style),
-        rx.link("Operaciones", href="/operaciones", style=link_style),
-        rx.link("Gastos", href="/gastos", style=link_style),
-        rx.link("Admin", href="/admin", style=link_style),
-        width="100%",
-        max_width="1120px",
-        padding="1rem",
-        wrap="wrap",
+        logo_mark("2.6rem" if compact else "3.2rem"),
+        rx.vstack(
+            rx.text("Las Pizzas de Alejo", font_family=FONT_STACK, font_size="1.45rem", font_weight="900", line_height="1"),
+            rx.text("Catalogo y pedidos", color=GREEN, font_size="0.78rem", font_weight="700"),
+            spacing="0",
+            align="start",
+        ),
+        spacing="3",
         align="center",
+    )
+
+
+def pill_button(label: str, **props: object) -> rx.Component:
+    return rx.button(
+        label,
+        border_radius="999px",
+        background=props.pop("background", GREEN),
+        color=props.pop("color", CREAM),
+        border=props.pop("border", "0"),
+        box_shadow=props.pop("box_shadow", "0 10px 24px rgba(23, 46, 29, 0.14)"),
+        font_weight="800",
+        cursor="pointer",
+        _hover={"transform": "translateY(-1px)", "filter": "brightness(1.05)"},
+        transition="all 160ms ease",
+        **props,
+    )
+
+
+def outline_button(label: str, **props: object) -> rx.Component:
+    return pill_button(
+        label,
+        background="rgba(255,255,255,0.72)",
+        color=GREEN,
+        border=f"1px solid rgba(23, 46, 29, 0.18)",
+        box_shadow="none",
+        **props,
     )
 
 
 def field(label: str, control: rx.Component) -> rx.Component:
     return rx.vstack(
-        rx.text(label, font_weight="600", font_size="0.9rem"),
+        rx.text(label, font_weight="800", font_size="0.86rem", color=GREEN),
         control,
         spacing="1",
         align="stretch",
@@ -60,63 +98,374 @@ def field(label: str, control: rx.Component) -> rx.Component:
     )
 
 
-def panel(*children: rx.Component) -> rx.Component:
+def input_style() -> dict[str, str]:
+    return {
+        "background": "#fffdf5",
+        "border": "1px solid rgba(23, 46, 29, 0.18)",
+        "border_radius": "12px",
+        "box_shadow": "none",
+        "color": GREEN,
+        "font_weight": "700",
+    }
+
+
+def placeholder_style() -> dict[str, str]:
+    return {"color": "#6c757d"}
+
+
+def panel(*children: rx.Component, accent: bool = False) -> rx.Component:
     return rx.box(
         rx.vstack(*children, spacing="4", align="stretch"),
         width="100%",
-        background="#ffffff",
-        border="1px solid #deded6",
-        border_radius="8px",
+        background="#fffdf5",
+        border=f"1px solid {'rgba(169, 15, 43, 0.25)' if accent else 'rgba(23, 46, 29, 0.12)'}",
+        border_radius="18px",
         padding="1rem",
+        box_shadow="0 18px 48px rgba(23, 46, 29, 0.10)",
+    )
+
+
+def public_nav() -> rx.Component:
+    return rx.box(
+        rx.hstack(
+            brand_block(compact=True),
+            rx.spacer(),
+            pill_button(
+                "Ver mi pedido",
+                on_click=PublicOrderState.show_cart,
+                background=RED,
+                color="#fff8e5",
+            ),
+            width="100%",
+            max_width="1180px",
+            padding="1rem",
+            align="center",
+        ),
+        width="100%",
+        background="rgba(240, 233, 207, 0.82)",
+        backdrop_filter="blur(18px)",
+        border_bottom="1px solid rgba(23, 46, 29, 0.10)",
+        position="sticky",
+        top="0",
+        z_index="10",
+        display="flex",
+        justify_content="center",
+    )
+
+
+def public_shell(*children: rx.Component) -> rx.Component:
+    return page_bg(
+        public_nav(),
+        rx.box(
+            rx.vstack(*children, spacing="5", align="stretch"),
+            width="100%",
+            max_width="1180px",
+            margin="0 auto",
+            padding="1rem",
+        ),
+    )
+
+
+def hero() -> rx.Component:
+    return rx.box(
+        rx.vstack(
+            rx.text("Hacemos que compartir sea más rico", color=RED, font_weight="900"),
+            rx.heading(
+                "Elige por categoría",
+                size="8",
+                font_family=FONT_STACK,
+                color=GREEN,
+                letter_spacing="0",
+            ),
+            rx.text(
+                "Explora el catalogo, suma productos al pedido y confirma todo desde el carrito.",
+                max_width="680px",
+                color="#5a4b38",
+                font_size="1.05rem",
+            ),
+            spacing="2",
+            align="start",
+        ),
+        padding="2rem 0 0.5rem",
+    )
+
+
+def category_card(category: rx.Var[dict]) -> rx.Component:
+    return rx.box(
+        rx.vstack(
+            rx.hstack(
+                rx.box(width="0.75rem", height="2.4rem", border_radius="999px", background=RED),
+                rx.spacer(),
+                rx.text(category["codigo"], color=GOLD, font_weight="900", font_size="0.75rem"),
+                width="100%",
+                align="center",
+            ),
+            rx.text(category["nombre"], font_family=FONT_STACK, font_size="1.4rem", color=GREEN, font_weight="900"),
+            rx.text(category["total"], " productos", color="#725f45", font_weight="700"),
+            pill_button("Ver catalogo", on_click=PublicOrderState.show_category(category["id"]), width="100%"),
+            spacing="4",
+            align="stretch",
+        ),
+        min_height="190px",
+        padding="1rem",
+        border_radius="18px",
+        background="#fffdf5",
+        border="1px solid rgba(23, 46, 29, 0.12)",
+        box_shadow="0 20px 48px rgba(23, 46, 29, 0.10)",
+    )
+
+
+def food_visual(title: rx.Var[str] | str, height: str = "150px") -> rx.Component:
+    return rx.center(
+        rx.text(title, color="#fff8e5", font_family=SCRIPT_STACK, font_size="1.6rem", font_weight="900"),
+        height=height,
+        border_radius="14px",
+        background=f"radial-gradient(circle at 30% 20%, {GOLD} 0 18%, transparent 19%), linear-gradient(135deg, {RED}, {GREEN})",
+        overflow="hidden",
+    )
+
+
+def product_image(product: rx.Var[dict], height: str = "150px") -> rx.Component:
+    return rx.cond(
+        product["foto"] != "",
+        rx.image(
+            src=product["foto"],
+            width="100%",
+            height=height,
+            object_fit="cover",
+            border_radius="14px",
+        ),
+        food_visual(product["nombre"], height),
     )
 
 
 def product_card(product: rx.Var[dict]) -> rx.Component:
     return rx.box(
         rx.vstack(
-            rx.text(product["nombre"], font_weight="700"),
-            rx.text("$", product["precio"]),
-            rx.text("ID ", product["id"], font_size="0.8rem", color="#666"),
-            rx.button("Elegir", on_click=PublicOrderState.select_product(product["id"]), width="100%"),
-            spacing="2",
+            product_image(product),
+            rx.vstack(
+                rx.text(product["categoria"], color=RED, font_weight="900", font_size="0.76rem"),
+                rx.text(product["nombre"], font_family=FONT_STACK, font_size="1.18rem", font_weight="900", color=GREEN),
+                rx.hstack(
+                    rx.text("$", product["precio"], font_weight="900", color=INK),
+                    rx.spacer(),
+                    outline_button("Ver", on_click=PublicOrderState.open_product(product["id"])),
+                    width="100%",
+                    align="center",
+                ),
+                spacing="2",
+                align="stretch",
+                width="100%",
+            ),
+            spacing="3",
             align="stretch",
         ),
-        border="1px solid #deded6",
-        border_radius="8px",
-        padding="0.9rem",
-        background="#fbfbf8",
+        padding="0.7rem",
+        border_radius="18px",
+        background="#fffdf5",
+        border="1px solid rgba(23, 46, 29, 0.12)",
+        box_shadow="0 18px 42px rgba(23, 46, 29, 0.09)",
     )
 
 
-def zone_card(zone: rx.Var[dict]) -> rx.Component:
-    return rx.box(
-        rx.vstack(
-            rx.text(zone["nombre"], font_weight="700"),
-            rx.text("$", zone["costo"]),
-            rx.text("ID ", zone["id"], font_size="0.8rem", color="#666"),
-            spacing="1",
-            align="stretch",
+def categories_view() -> rx.Component:
+    return rx.vstack(
+        hero(),
+        rx.grid(
+            rx.foreach(PublicOrderState.categories, category_card),
+            columns="repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
+            spacing="4",
+            width="100%",
         ),
-        border="1px solid #deded6",
-        border_radius="8px",
-        padding="0.75rem",
-        background="#fbfbf8",
+        spacing="4",
+        align="stretch",
     )
 
 
-def public_page() -> rx.Component:
-    return shell(
-        rx.vstack(
-            rx.heading("Nuevo pedido", size="7"),
-            rx.text("Formulario publico para clientes"),
+def products_view() -> rx.Component:
+    return rx.vstack(
+        rx.hstack(
+            outline_button("Volver", on_click=PublicOrderState.show_categories),
+            rx.spacer(),
+            pill_button("Ver mi pedido", on_click=PublicOrderState.show_cart, background=RED),
+            width="100%",
+        ),
+        rx.heading("Productos disponibles", size="7", font_family=FONT_STACK, color=GREEN),
+        rx.grid(
+            rx.foreach(PublicOrderState.visible_products, product_card),
+            columns="repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
+            spacing="4",
+            width="100%",
+        ),
+        spacing="4",
+        align="stretch",
+    )
+
+
+def detail_view() -> rx.Component:
+    return rx.vstack(
+        rx.hstack(
+            outline_button("Volver", on_click=PublicOrderState.show_category(PublicOrderState.selected_category_id)),
+            rx.spacer(),
+            pill_button("Ver mi pedido", on_click=PublicOrderState.show_cart, background=RED),
+            width="100%",
+        ),
+        rx.grid(
+            product_image(PublicOrderState.selected_product, "clamp(220px, 48vw, 360px)"),
             panel(
+                rx.text(PublicOrderState.selected_product["categoria"], color=RED, font_weight="900"),
+                rx.heading(
+                    PublicOrderState.selected_product["nombre"],
+                    size="8",
+                    font_family=FONT_STACK,
+                    color=GREEN,
+                ),
+                rx.text(PublicOrderState.selected_product["descripcion"], color="#5a4b38", font_size="1.02rem"),
+                rx.text("$", PublicOrderState.selected_product["precio"], font_size="1.8rem", font_weight="900"),
                 field(
-                    "Cliente",
+                    "Cantidad",
+                    rx.input(
+                        value=PublicOrderState.detail_quantity,
+                        on_change=PublicOrderState.set_detail_quantity,
+                        type="number",
+                        min="1",
+                        size="3",
+                        style=input_style(),
+                    ),
+                ),
+                pill_button("Agregar al carrito", on_click=PublicOrderState.add_selected_to_cart, background=RED),
+                accent=True,
+            ),
+            columns="repeat(auto-fit, minmax(min(100%, 340px), 1fr))",
+            spacing="5",
+            width="100%",
+        ),
+        rx.text(PublicOrderState.message, color=GREEN, font_weight="900"),
+        spacing="4",
+        align="stretch",
+    )
+
+
+def cart_item(item: rx.Var[dict]) -> rx.Component:
+    return rx.flex(
+        rx.box(width="0.5rem", align_self="stretch", border_radius="999px", background=GOLD),
+        rx.vstack(
+            rx.text(item["nombre"], font_weight="900", color=GREEN),
+            rx.text("Cantidad: ", item["cantidad"], " | Subtotal: $", item["subtotal_display"], color="#725f45"),
+            rx.cond(
+                item["promo_label"] != "",
+                rx.text(item["promo_label"], color=RED, font_weight="900", font_size="0.88rem"),
+                rx.fragment(),
+            ),
+            spacing="1",
+            align="start",
+            flex="1",
+        ),
+        outline_button("Quitar", on_click=PublicOrderState.remove_cart_item(item["producto_id"])),
+        width="100%",
+        padding="0.85rem",
+        border_radius="14px",
+        background="#fffaf0",
+        border="1px solid rgba(23, 46, 29, 0.10)",
+        align="center",
+        gap="0.75rem",
+        flex_wrap="wrap",
+    )
+
+
+def zone_option(zone: rx.Var[dict]) -> rx.Component:
+    return rx.button(
+        rx.hstack(
+            rx.text(zone["nombre"], font_weight="900"),
+            rx.spacer(),
+            rx.text("$", zone["costo_display"], font_weight="900"),
+            width="100%",
+        ),
+        on_click=PublicOrderState.select_zone(zone["id"]),
+        width="100%",
+        border_radius="14px",
+        padding="0.85rem",
+        background=rx.cond(
+            PublicOrderState.zona_envio_id == zone["id_str"],
+            GREEN,
+            "#fffaf0",
+        ),
+        color=rx.cond(
+            PublicOrderState.zona_envio_id == zone["id_str"],
+            CREAM,
+            GREEN,
+        ),
+        border="1px solid rgba(23, 46, 29, 0.16)",
+        cursor="pointer",
+    )
+
+
+def delivery_button(label: str, value: str) -> rx.Component:
+    return rx.button(
+        label,
+        on_click=PublicOrderState.set_delivery_mode(value),
+        width="100%",
+        border_radius="14px",
+        padding="0.85rem",
+        background=rx.cond(PublicOrderState.delivery_mode == value, GREEN, "#fffaf0"),
+        color=rx.cond(PublicOrderState.delivery_mode == value, CREAM, GREEN),
+        border="1px solid rgba(23, 46, 29, 0.16)",
+        font_weight="900",
+        cursor="pointer",
+    )
+
+
+def payment_button(label: str, value: str) -> rx.Component:
+    return rx.button(
+        label,
+        on_click=PublicOrderState.set_forma_pago(value),
+        width="100%",
+        border_radius="14px",
+        padding="0.85rem",
+        background=rx.cond(PublicOrderState.forma_pago == value, RED, "#fffaf0"),
+        color=rx.cond(PublicOrderState.forma_pago == value, "#fff8e5", GREEN),
+        border="1px solid rgba(169, 15, 43, 0.18)",
+        font_weight="900",
+        cursor="pointer",
+    )
+
+
+def cart_view() -> rx.Component:
+    return rx.vstack(
+        rx.hstack(outline_button("Seguir comprando", on_click=PublicOrderState.show_categories), width="100%"),
+        rx.grid(
+            panel(
+                rx.heading("Mi pedido", size="7", font_family=FONT_STACK, color=GREEN),
+                rx.vstack(rx.foreach(PublicOrderState.cart, cart_item), spacing="2", align="stretch"),
+                rx.hstack(
+                    rx.text("Total productos", font_weight="900"),
+                    rx.spacer(),
+                    rx.text("$", PublicOrderState.cart_total_display, font_weight="900", font_size="1.3rem"),
+                    width="100%",
+                ),
+                rx.hstack(
+                    rx.text("Envio", font_weight="900"),
+                    rx.spacer(),
+                    rx.text("$", rx.cond(PublicOrderState.delivery_mode == "delivery", PublicOrderState.selected_zone_cost, "0,00"), font_weight="900"),
+                    width="100%",
+                ),
+                rx.hstack(
+                    rx.text("Total", font_weight="900", color=RED),
+                    rx.spacer(),
+                    rx.text("$", PublicOrderState.order_total_display, font_weight="900", font_size="1.45rem", color=RED),
+                    width="100%",
+                ),
+            ),
+            panel(
+                rx.heading("Confirmar pedido", size="6", font_family=FONT_STACK, color=GREEN),
+                field(
+                    "Nombre y apellido",
                     rx.input(
                         value=PublicOrderState.nombre_apellido,
                         on_change=PublicOrderState.set_nombre_apellido,
-                        placeholder="Nombre y apellido",
-                        size="3",
+                        placeholder="Tu nombre",
+                        style=input_style(),
+                        _placeholder=placeholder_style(),
                     ),
                 ),
                 field(
@@ -124,8 +473,9 @@ def public_page() -> rx.Component:
                     rx.input(
                         value=PublicOrderState.telefono,
                         on_change=PublicOrderState.set_telefono,
-                        placeholder="+54 381 ...",
-                        size="3",
+                        placeholder="381...",
+                        style=input_style(),
+                        _placeholder=placeholder_style(),
                     ),
                 ),
                 field(
@@ -133,111 +483,182 @@ def public_page() -> rx.Component:
                     rx.input(
                         value=PublicOrderState.fecha_entrega,
                         on_change=PublicOrderState.set_fecha_entrega,
-                        placeholder="AAAA-MM-DD",
-                        size="3",
-                    ),
-                ),
-                rx.heading("Producto", size="5"),
-                rx.grid(
-                    rx.foreach(PublicOrderState.products, product_card),
-                    columns="repeat(auto-fit, minmax(180px, 1fr))",
-                    spacing="3",
-                    width="100%",
-                ),
-                field(
-                    "Cantidad",
-                    rx.input(
-                        value=PublicOrderState.quantity,
-                        on_change=PublicOrderState.set_quantity,
-                        type="number",
-                        min="1",
-                        size="3",
+                        placeholder="DD/MM/AAAA",
+                        max_length=10,
+                        input_mode="numeric",
+                        style=input_style(),
+                        _placeholder=placeholder_style(),
                     ),
                 ),
                 field(
-                    "Segundo sabor opcional",
+                    "Horario ideal de entrega",
                     rx.input(
-                        value=PublicOrderState.selected_combo_id,
-                        on_change=PublicOrderState.set_selected_combo_id,
-                        placeholder="ID de producto combo, opcional",
-                        size="3",
+                        value=PublicOrderState.horario_entrega,
+                        on_change=PublicOrderState.set_horario_entrega,
+                        placeholder="HH:MM",
+                        max_length=5,
+                        input_mode="numeric",
+                        style=input_style(),
+                        _placeholder=placeholder_style(),
                     ),
                 ),
                 field(
-                    "Direccion",
-                    rx.input(
-                        value=PublicOrderState.direccion_delivery,
-                        on_change=PublicOrderState.set_direccion_delivery,
-                        size="3",
+                    "Entrega",
+                    rx.grid(
+                        delivery_button("Retiro del local", "retiro"),
+                        delivery_button("Necesito que me lo envie", "delivery"),
+                        columns="repeat(auto-fit, minmax(min(100%, 160px), 1fr))",
+                        spacing="2",
+                        width="100%",
                     ),
                 ),
-                field(
-                    "Zona de envio",
-                    rx.input(
-                        value=PublicOrderState.zona_envio_id,
-                        on_change=PublicOrderState.set_zona_envio_id,
-                        placeholder="ID de zona, vacio para retiro",
-                        size="3",
+                rx.cond(
+                    PublicOrderState.delivery_mode == "delivery",
+                    rx.vstack(
+                        field(
+                            "Direccion",
+                            rx.input(
+                                value=PublicOrderState.direccion_delivery,
+                                on_change=PublicOrderState.set_direccion_delivery,
+                                placeholder="Calle, numero, localidad",
+                                style=input_style(),
+                                _placeholder=placeholder_style(),
+                            ),
+                        ),
+                        field("Zona de envio", rx.vstack(rx.foreach(PublicOrderState.zones, zone_option), spacing="2", align="stretch")),
+                        spacing="4",
+                        align="stretch",
                     ),
-                ),
-                rx.grid(
-                    rx.foreach(PublicOrderState.zones, zone_card),
-                    columns="repeat(auto-fit, minmax(180px, 1fr))",
-                    spacing="3",
-                    width="100%",
+                    rx.fragment(),
                 ),
                 field(
                     "Forma de pago",
-                    rx.hstack(
-                        rx.button(
-                            "Efectivo",
-                            on_click=PublicOrderState.set_forma_pago("efectivo"),
-                            size="3",
-                        ),
-                        rx.button(
-                            "Transferencia",
-                            on_click=PublicOrderState.set_forma_pago("transferencia"),
-                            size="3",
-                        ),
+                    rx.grid(
+                        payment_button("Efectivo", "efectivo"),
+                        payment_button("Transferencia", "transferencia"),
+                        columns="repeat(auto-fit, minmax(min(100%, 150px), 1fr))",
+                        spacing="2",
+                        width="100%",
                     ),
+                ),
+                rx.cond(
+                    PublicOrderState.forma_pago == "efectivo",
+                    rx.text(
+                        "En observaciones contanos con cuanto vas a pagar para que el delivery lleve cambio.",
+                        color=RED,
+                        font_weight="900",
+                        font_size="0.9rem",
+                    ),
+                    rx.fragment(),
                 ),
                 field(
                     "Observaciones",
                     rx.text_area(
                         value=PublicOrderState.observaciones,
                         on_change=PublicOrderState.set_observaciones,
+                        placeholder="Referencias, cambio para efectivo, aclaraciones del pedido...",
+                        style=input_style(),
+                        _placeholder=placeholder_style(),
                     ),
                 ),
-                rx.button("Confirmar pedido", on_click=PublicOrderState.submit_order, size="4"),
-                rx.text(PublicOrderState.message, color="#2f5d50", font_weight="600"),
+                pill_button("Confirmar pedido", on_click=PublicOrderState.submit_order, background=RED, width="100%"),
+                rx.text(PublicOrderState.message, color=GREEN, font_weight="900"),
+                accent=True,
             ),
-            spacing="4",
-            align="stretch",
+            columns="repeat(auto-fit, minmax(min(100%, 360px), 1fr))",
+            spacing="5",
             width="100%",
+        ),
+        spacing="4",
+        align="stretch",
+    )
+
+
+def public_page() -> rx.Component:
+    return public_shell(
+        rx.cond(
+            PublicOrderState.view == "products",
+            products_view(),
+            rx.cond(
+                PublicOrderState.view == "detail",
+                detail_view(),
+                rx.cond(PublicOrderState.view == "cart", cart_view(), categories_view()),
+            ),
         )
     )
 
 
+def internal_nav() -> rx.Component:
+    link_style = {
+        "padding": "0.62rem 0.9rem",
+        "border_radius": "999px",
+        "background": "rgba(255,255,255,0.70)",
+        "border": "1px solid rgba(23, 46, 29, 0.14)",
+        "color": GREEN,
+        "font_weight": "900",
+    }
+    return rx.box(
+        rx.hstack(
+            brand_block(compact=True),
+            rx.spacer(),
+            rx.link("Pedidos", href="/pedidos", style=link_style),
+            rx.link("Gastos", href="/gastos", style=link_style),
+            rx.link("Admin", href="/admin", style=link_style),
+            outline_button("Salir", on_click=AuthState.logout),
+            width="100%",
+            max_width="1180px",
+            padding="1rem",
+            align="center",
+            wrap="wrap",
+        ),
+        width="100%",
+        background="rgba(240, 233, 207, 0.86)",
+        backdrop_filter="blur(18px)",
+        border_bottom="1px solid rgba(23, 46, 29, 0.10)",
+        display="flex",
+        justify_content="center",
+    )
+
+
+def internal_shell(*children: rx.Component) -> rx.Component:
+    return page_bg(
+        internal_nav(),
+        rx.box(
+            rx.vstack(*children, spacing="5", align="stretch"),
+            width="100%",
+            max_width="1180px",
+            margin="0 auto",
+            padding="1rem",
+        ),
+    )
+
+
 def login_page() -> rx.Component:
-    return shell(
-        panel(
-            rx.heading("Login operativo", size="7"),
-            field("Usuario", rx.input(value=AuthState.username, on_change=AuthState.set_username, size="3")),
-            field(
-                "Password",
-                rx.input(
-                    value=AuthState.password,
-                    on_change=AuthState.set_password,
-                    type="password",
-                    size="3",
+    return page_bg(
+        rx.center(
+            rx.box(
+                panel(
+                    brand_block(),
+                    rx.heading("Ingresar al panel", size="7", font_family=FONT_STACK, color=GREEN),
+                    field("Usuario", rx.input(value=AuthState.username, on_change=AuthState.set_username, size="3", style=input_style())),
+                    field(
+                        "Password",
+                        rx.input(
+                            value=AuthState.password,
+                            on_change=AuthState.set_password,
+                            type="password",
+                            size="3",
+                            style=input_style(),
+                        ),
+                    ),
+                    pill_button("Ingresar", on_click=AuthState.login, size="3", background=RED, width="100%"),
+                    rx.text(AuthState.message, color=RED, font_weight="900"),
                 ),
+                width="100%",
+                max_width="430px",
             ),
-            rx.hstack(
-                rx.button("Ingresar", on_click=AuthState.login, size="3"),
-                rx.button("Salir", on_click=AuthState.logout, size="3", variant="outline"),
-            ),
-            rx.text("Usuario actual: ", AuthState.username, " / ", AuthState.role),
-            rx.text(AuthState.message, color="#2f5d50", font_weight="600"),
+            min_height="100vh",
+            padding="1rem",
         )
     )
 
@@ -245,105 +666,100 @@ def login_page() -> rx.Component:
 def order_card(order: rx.Var[dict]) -> rx.Component:
     return rx.box(
         rx.vstack(
-            rx.hstack(rx.text(order["codigo"], font_weight="800"), rx.spacer(), rx.text(order["estado"])),
-            rx.text(order["cliente"]),
-            rx.text("Total $", order["total"]),
-            rx.text(order["fecha"], color="#666"),
+            rx.hstack(rx.text(order["codigo"], font_weight="900", color=GREEN), rx.spacer(), rx.text(order["estado"], color=RED, font_weight="900")),
+            rx.text(order["cliente"], font_weight="800"),
+            rx.text("Entrega: ", order["fecha"], color="#725f45"),
+            rx.text("Total $", order["total"], font_weight="900"),
             rx.hstack(
-                rx.button("En proceso", on_click=OperationsState.transition(order["id"], "en_proceso")),
-                rx.button("Entregado", on_click=OperationsState.transition(order["id"], "entregado")),
-                rx.button("Cancelar", on_click=OperationsState.transition(order["id"], "cancelado")),
+                outline_button("En proceso", on_click=OperationsState.transition(order["id"], "en_proceso")),
+                outline_button("Entregado", on_click=OperationsState.transition(order["id"], "entregado")),
+                outline_button("Cancelar", on_click=OperationsState.transition(order["id"], "cancelado")),
                 wrap="wrap",
             ),
             spacing="3",
             align="stretch",
         ),
-        background="#ffffff",
-        border="1px solid #deded6",
-        border_radius="8px",
+        background="#fffdf5",
+        border="1px solid rgba(23, 46, 29, 0.12)",
+        border_radius="18px",
         padding="1rem",
+        box_shadow="0 18px 42px rgba(23, 46, 29, 0.09)",
     )
 
 
-def operations_page() -> rx.Component:
-    return shell(
-        rx.vstack(
-            rx.heading("Operaciones", size="7"),
-            rx.button("Actualizar", on_click=OperationsState.load_orders),
-            rx.text(OperationsState.message, color="#7a3d16", font_weight="600"),
-            rx.grid(
-                rx.foreach(OperationsState.orders, order_card),
-                columns="repeat(auto-fit, minmax(240px, 1fr))",
-                spacing="3",
-                width="100%",
-            ),
-            spacing="4",
-            align="stretch",
+def orders_page() -> rx.Component:
+    return internal_shell(
+        rx.hstack(
+            rx.heading("Pedidos", size="7", font_family=FONT_STACK, color=GREEN),
+            rx.spacer(),
+            pill_button("Actualizar", on_click=OperationsState.load_orders),
             width="100%",
-        )
+        ),
+        rx.text(OperationsState.message, color=RED, font_weight="900"),
+        rx.grid(
+            rx.foreach(OperationsState.orders, order_card),
+            columns="repeat(auto-fit, minmax(260px, 1fr))",
+            spacing="4",
+            width="100%",
+        ),
     )
 
 
 def expense_card(expense: rx.Var[dict]) -> rx.Component:
     return rx.box(
         rx.vstack(
-            rx.text(expense["codigo"], font_weight="800"),
-            rx.text(expense["fecha"]),
+            rx.text(expense["codigo"], font_weight="900", color=GREEN),
+            rx.text(expense["fecha"], color="#725f45"),
             rx.text(expense["cantidad"], " ", expense["unidad"]),
-            rx.text("$", expense["precio"]),
-            rx.text(expense["lugar"], color="#666"),
+            rx.text("$", expense["precio"], font_weight="900"),
+            rx.text(expense["lugar"], color="#725f45"),
             spacing="2",
             align="stretch",
         ),
-        background="#ffffff",
-        border="1px solid #deded6",
-        border_radius="8px",
+        background="#fffdf5",
+        border="1px solid rgba(23, 46, 29, 0.12)",
+        border_radius="18px",
         padding="1rem",
     )
 
 
 def expenses_page() -> rx.Component:
-    return shell(
-        rx.vstack(
-            rx.heading("Gastos", size="7"),
+    return internal_shell(
+        rx.heading("Gastos", size="7", font_family=FONT_STACK, color=GREEN),
+        rx.grid(
             panel(
-                field("Fecha", rx.input(value=ExpenseState.fecha, on_change=ExpenseState.set_fecha, placeholder="AAAA-MM-DD")),
-                field("Motivo", rx.input(value=ExpenseState.motivo_nombre, on_change=ExpenseState.set_motivo_nombre)),
-                field("Marca", rx.input(value=ExpenseState.marca_nombre, on_change=ExpenseState.set_marca_nombre)),
-                field("Cantidad", rx.input(value=ExpenseState.cantidad, on_change=ExpenseState.set_cantidad)),
-                field("Unidad", rx.input(value=ExpenseState.unidad_medida, on_change=ExpenseState.set_unidad_medida)),
-                field("Precio", rx.input(value=ExpenseState.precio, on_change=ExpenseState.set_precio)),
-                field("Lugar", rx.input(value=ExpenseState.lugar_texto, on_change=ExpenseState.set_lugar_texto)),
+                field("Fecha", rx.input(value=ExpenseState.fecha, on_change=ExpenseState.set_fecha, placeholder="AAAA-MM-DD", style=input_style())),
+                field("Motivo", rx.input(value=ExpenseState.motivo_nombre, on_change=ExpenseState.set_motivo_nombre, style=input_style())),
+                field("Marca", rx.input(value=ExpenseState.marca_nombre, on_change=ExpenseState.set_marca_nombre, style=input_style())),
+                field("Cantidad", rx.input(value=ExpenseState.cantidad, on_change=ExpenseState.set_cantidad, style=input_style())),
+                field("Unidad", rx.input(value=ExpenseState.unidad_medida, on_change=ExpenseState.set_unidad_medida, style=input_style())),
+                field("Precio", rx.input(value=ExpenseState.precio, on_change=ExpenseState.set_precio, style=input_style())),
+                field("Lugar", rx.input(value=ExpenseState.lugar_texto, on_change=ExpenseState.set_lugar_texto, style=input_style())),
                 rx.hstack(
-                    rx.button("Guardar gasto", on_click=ExpenseState.submit_expense),
-                    rx.button("Actualizar lista", on_click=ExpenseState.load_expenses, variant="outline"),
+                    pill_button("Guardar gasto", on_click=ExpenseState.submit_expense, background=RED),
+                    outline_button("Actualizar lista", on_click=ExpenseState.load_expenses),
                 ),
-                rx.text(ExpenseState.message, color="#2f5d50", font_weight="600"),
+                rx.text(ExpenseState.message, color=GREEN, font_weight="900"),
             ),
-            rx.grid(
-                rx.foreach(ExpenseState.expenses, expense_card),
-                columns="repeat(auto-fit, minmax(220px, 1fr))",
-                spacing="3",
-                width="100%",
-            ),
-            spacing="4",
-            align="stretch",
+            rx.vstack(rx.foreach(ExpenseState.expenses, expense_card), spacing="3", align="stretch"),
+            columns="minmax(280px, 420px) minmax(0, 1fr)",
+            spacing="5",
             width="100%",
-        )
+        ),
     )
 
 
 def table_button(table_name: rx.Var[str]) -> rx.Component:
-    return rx.button(table_name, on_click=AdminCrudState.set_table(table_name), variant="outline")
+    return outline_button(table_name, on_click=AdminCrudState.set_table(table_name))
 
 
 def record_card(record: rx.Var[dict]) -> rx.Component:
     return rx.box(
         rx.text(record["display"]),
-        background="#ffffff",
-        border="1px solid #deded6",
-        border_radius="8px",
-        padding="0.75rem",
+        background="#fffdf5",
+        border="1px solid rgba(23, 46, 29, 0.12)",
+        border_radius="14px",
+        padding="0.85rem",
         overflow_x="auto",
         font_family="monospace",
         font_size="0.85rem",
@@ -351,47 +767,38 @@ def record_card(record: rx.Var[dict]) -> rx.Component:
 
 
 def admin_page() -> rx.Component:
-    return shell(
-        rx.vstack(
-            rx.heading("Administracion", size="7"),
-            panel(
-                rx.text("Tabla", font_weight="700"),
-                rx.hstack(rx.foreach(AdminCrudState.tables, table_button), wrap="wrap"),
-                field(
-                    "JSON de alta/edicion",
-                    rx.text_area(
-                        value=AdminCrudState.payload_json,
-                        on_change=AdminCrudState.set_payload_json,
-                        min_height="160px",
-                    ),
+    return internal_shell(
+        rx.heading("Admin", size="7", font_family=FONT_STACK, color=GREEN),
+        panel(
+            rx.text("Tabla", font_weight="900", color=GREEN),
+            rx.hstack(rx.foreach(AdminCrudState.tables, table_button), wrap="wrap"),
+            field(
+                "JSON de alta/edicion",
+                rx.text_area(
+                    value=AdminCrudState.payload_json,
+                    on_change=AdminCrudState.set_payload_json,
+                    min_height="160px",
+                    style=input_style(),
                 ),
-                field("ID para editar/borrar", rx.input(value=AdminCrudState.selected_id, on_change=AdminCrudState.set_selected_id)),
-                rx.hstack(
-                    rx.button("Listar", on_click=AdminCrudState.load_records),
-                    rx.button("Crear", on_click=AdminCrudState.create_record),
-                    rx.button("Actualizar", on_click=AdminCrudState.update_record),
-                    rx.button("Borrar", on_click=AdminCrudState.delete_record, color_scheme="red"),
-                    wrap="wrap",
-                ),
-                rx.text("Tabla actual: ", AdminCrudState.table_name),
-                rx.text(AdminCrudState.message, color="#7a3d16", font_weight="600"),
             ),
-            rx.vstack(
-                rx.foreach(AdminCrudState.records, record_card),
-                spacing="2",
-                align="stretch",
-                width="100%",
+            field("ID para editar/borrar", rx.input(value=AdminCrudState.selected_id, on_change=AdminCrudState.set_selected_id, style=input_style())),
+            rx.hstack(
+                pill_button("Listar", on_click=AdminCrudState.load_records),
+                pill_button("Crear", on_click=AdminCrudState.create_record, background=GOLD, color=GREEN),
+                outline_button("Actualizar", on_click=AdminCrudState.update_record),
+                pill_button("Borrar", on_click=AdminCrudState.delete_record, background=RED),
+                wrap="wrap",
             ),
-            spacing="4",
-            align="stretch",
-            width="100%",
-        )
+            rx.text("Tabla actual: ", AdminCrudState.table_name, font_weight="900"),
+            rx.text(AdminCrudState.message, color=RED, font_weight="900"),
+        ),
+        rx.vstack(rx.foreach(AdminCrudState.records, record_card), spacing="2", align="stretch", width="100%"),
     )
 
 
 app = rx.App()
 app.add_page(public_page, route="/", on_load=PublicOrderState.load_catalog)
 app.add_page(login_page, route="/login")
-app.add_page(operations_page, route="/operaciones", on_load=OperationsState.load_orders)
+app.add_page(orders_page, route="/pedidos", on_load=OperationsState.load_orders)
 app.add_page(expenses_page, route="/gastos", on_load=ExpenseState.load_expenses)
 app.add_page(admin_page, route="/admin")

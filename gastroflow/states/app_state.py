@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Any
+from urllib.parse import quote
+from zoneinfo import ZoneInfo
 
 import reflex as rx
 from sqlmodel import Session, select
@@ -11,7 +14,7 @@ from sqlmodel import Session, select
 from gastroflow.data.database import engine
 from gastroflow.domain.enums import EstadoPedido, FormaPago, RolUsuario
 from gastroflow.domain.errors import DomainError
-from gastroflow.models import Cliente, Gasto, Pedido, Producto, UsuarioRead, ZonaEnvio
+from gastroflow.models import Categoria, Cliente, Gasto, Pedido, Producto, UsuarioRead, ZonaEnvio
 from gastroflow.services import (
     AdminCrudService,
     AuthService,
@@ -22,6 +25,12 @@ from gastroflow.services import (
     OrderService,
     PublicOrderInput,
 )
+
+MONEY_QUANT = Decimal("0.01")
+STORE_NAME = os.getenv("STORE_NAME", "")
+PIZZERIA_WHATSAPP_PHONE = os.getenv("PIZZERIA_WHATSAPP_PHONE", "")
+TRANSFER_TITULAR = os.getenv("TRANSFER_TITULAR", "")
+TRANSFER_ALIAS = os.getenv("TRANSFER_ALIAS", "")
 
 
 def _display(value: Any) -> Any:
@@ -39,9 +48,44 @@ def _display_record(record: dict[str, Any]) -> dict[str, Any]:
 def _display_record_row(record: dict[str, Any]) -> dict[str, Any]:
     display_record = _display_record(record)
     return {
-        "id": display_record.get("id", ""),
+        "id": str(display_record.get("id", "")),
         "display": json.dumps(display_record, ensure_ascii=False, default=str),
     }
+
+
+def _money_text(value: Decimal | str | int) -> str:
+    amount = Decimal(str(value)).quantize(MONEY_QUANT)
+    return f"{amount:.2f}".replace(".", ",")
+
+
+def _parse_delivery_date(value: str) -> date:
+    clean = value.strip()
+    if "-" in clean:
+        return date.fromisoformat(clean)
+    day, month, year = clean.split("/")
+    return date(int(year), int(month), int(day))
+
+
+def _mask_date(value: str) -> str:
+    digits = "".join(char for char in value if char.isdigit())[:8]
+    if len(digits) <= 2:
+        return digits
+    if len(digits) <= 4:
+        return f"{digits[:2]}/{digits[2:]}"
+    return f"{digits[:2]}/{digits[2:4]}/{digits[4:]}"
+
+
+def _mask_time(value: str) -> str:
+    digits = "".join(char for char in value if char.isdigit())[:4]
+    if len(digits) <= 2:
+        return digits
+    return f"{digits[:2]}:{digits[2:]}"
+
+
+def _validate_time(value: str) -> None:
+    hour, minute = value.split(":")
+    if not (0 <= int(hour) <= 23 and 0 <= int(minute) <= 59):
+        raise ValueError("Ingresa un horario valido con formato HH:MM.")
 
 
 class AuthState(rx.State):
@@ -69,7 +113,7 @@ class AuthState(rx.State):
             updated_at=datetime.now(timezone.utc),
         )
 
-    def login(self) -> None:
+    def login(self) -> rx.event.EventSpec | None:
         try:
             with Session(engine) as session:
                 user = AuthService(session).authenticate(self.username, self.password)
@@ -78,78 +122,344 @@ class AuthState(rx.State):
             self.role = user.rol.value
             self.password = ""
             self.message = "Sesion iniciada."
+            return rx.redirect("/pedidos")
         except DomainError as exc:
             self.message = str(exc)
+            return None
 
-    def logout(self) -> None:
+    def logout(self) -> rx.event.EventSpec:
         self.username = ""
         self.password = ""
         self.user_id = 0
         self.role = ""
         self.message = "Sesion cerrada."
+        return rx.redirect("/login")
 
 
 class PublicOrderState(rx.State):
+    categories: list[dict[str, Any]] = []
     products: list[dict[str, Any]] = []
+    visible_products: list[dict[str, Any]] = []
     zones: list[dict[str, Any]] = []
-    selected_product_id: str = ""
-    selected_combo_id: str = ""
-    quantity: str = "1"
+    cart: list[dict[str, Any]] = []
+    selected_product: dict[str, Any] = {}
+    selected_category_id: str = ""
+    view: str = "categories"
+    detail_quantity: str = "1"
     nombre_apellido: str = ""
     telefono: str = ""
     fecha_entrega: str = ""
-    direccion_delivery: str = "Retiro en el local"
+    horario_entrega: str = ""
+    direccion_delivery: str = ""
+    delivery_mode: str = "retiro"
     zona_envio_id: str = ""
+    selected_zone_name: str = ""
+    selected_zone_cost: str = "0,00"
     forma_pago: str = FormaPago.EFECTIVO.value
     observaciones: str = ""
+    cart_total: str = "0.00"
+    cart_total_display: str = "0,00"
+    order_total_display: str = "0,00"
     message: str = ""
 
     def load_catalog(self) -> None:
         with Session(engine) as session:
+            categories = session.exec(select(Categoria)).all()
             products = session.exec(select(Producto)).all()
             zones = session.exec(select(ZonaEnvio)).all()
+
+        category_names = {category.id: category.nombre for category in categories}
+        product_count_by_category: dict[int, int] = {}
+        for product in products:
+            product_count_by_category[product.categoria_id] = product_count_by_category.get(product.categoria_id, 0) + 1
+
+        self.categories = [
+            {
+                "id": category.id,
+                "codigo": category.codigo,
+                "nombre": category.nombre,
+                "total": product_count_by_category.get(category.id or 0, 0),
+            }
+            for category in categories
+        ]
         self.products = [
             {
                 "id": product.id,
+                "categoria_id": product.categoria_id,
+                "categoria": category_names.get(product.categoria_id, ""),
+                "codigo": product.codigo,
                 "nombre": product.nombre,
                 "precio": str(product.precio),
-                "descripcion": product.descripcion or "",
+                "descripcion": product.descripcion or "Producto artesanal listo para sumar a tu pedido.",
+                "foto": (product.fotos or [""])[0] if product.fotos else "",
             }
             for product in products
         ]
-        self.zones = [{"id": zone.id, "nombre": zone.nombre, "costo": str(zone.costo)} for zone in zones]
+        self.zones = [
+            {
+                "id": zone.id,
+                "id_str": str(zone.id),
+                "nombre": zone.nombre,
+                "costo": str(zone.costo),
+                "costo_display": _money_text(zone.costo),
+            }
+            for zone in zones
+        ]
+        if not self.view:
+            self.view = "categories"
 
-    def select_product(self, product_id: int) -> None:
-        self.selected_product_id = str(product_id)
+    def show_categories(self) -> None:
+        self.view = "categories"
+        self.selected_category_id = ""
+        self.visible_products = []
+        self.selected_product = {}
+        self.message = ""
 
-    def select_combo(self, product_id: int) -> None:
-        self.selected_combo_id = "" if self.selected_combo_id == str(product_id) else str(product_id)
+    def show_category(self, category_id: int) -> None:
+        self.selected_category_id = str(category_id)
+        self.visible_products = [
+            product for product in self.products if str(product["categoria_id"]) == str(category_id)
+        ]
+        self.selected_product = {}
+        self.view = "products"
+        self.message = ""
 
-    def submit_order(self) -> None:
+    def open_product(self, product_id: int) -> None:
+        product = next((item for item in self.products if str(item["id"]) == str(product_id)), {})
+        self.selected_product = product
+        self.detail_quantity = "1"
+        self.view = "detail"
+        self.message = ""
+
+    def add_selected_to_cart(self) -> None:
+        if not self.selected_product:
+            self.message = "Selecciona un producto."
+            return
         try:
-            if not self.selected_product_id:
-                raise ValueError("Selecciona un producto.")
-            item = OrderItemInput(
-                producto_id=int(self.selected_product_id),
-                producto_combo_id=int(self.selected_combo_id) if self.selected_combo_id else None,
-                cantidad=int(self.quantity),
+            quantity = int(self.detail_quantity)
+            if quantity <= 0:
+                raise ValueError
+        except ValueError:
+            self.message = "La cantidad debe ser mayor a cero."
+            return
+
+        product_id = int(self.selected_product["id"])
+        cart = list(self.cart)
+        for index, item in enumerate(cart):
+            if int(item["producto_id"]) == product_id:
+                item["cantidad"] = int(item["cantidad"]) + quantity
+                cart[index] = item
+                break
+        else:
+            price = Decimal(str(self.selected_product["precio"]))
+            cart.append(
+                {
+                    "producto_id": product_id,
+                    "nombre": self.selected_product["nombre"],
+                    "categoria": self.selected_product["categoria"],
+                    "precio": str(price),
+                    "precio_display": _money_text(price),
+                    "cantidad": quantity,
+                    "subtotal": str(price * Decimal(quantity)),
+                    "subtotal_display": _money_text(price * Decimal(quantity)),
+                    "base_subtotal_display": _money_text(price * Decimal(quantity)),
+                    "discount": "0.00",
+                    "discount_display": "0,00",
+                    "promo_label": "",
+                    "foto": self.selected_product.get("foto", ""),
+                }
             )
+        self.cart = cart
+        self._refresh_cart_total()
+        self.message = "Producto agregado al pedido."
+        self.view = "products"
+
+    def remove_cart_item(self, product_id: int) -> None:
+        self.cart = [item for item in self.cart if int(item["producto_id"]) != int(product_id)]
+        self._refresh_cart_total()
+        self.message = ""
+
+    def show_cart(self) -> None:
+        self.view = "cart"
+        self.message = ""
+
+    def set_fecha_entrega(self, value: str) -> None:
+        self.fecha_entrega = _mask_date(value)
+
+    def set_horario_entrega(self, value: str) -> None:
+        self.horario_entrega = _mask_time(value)
+
+    def set_delivery_mode(self, value: str) -> None:
+        self.delivery_mode = value
+        if value == "retiro":
+            self.direccion_delivery = ""
+            self.zona_envio_id = ""
+            self.selected_zone_name = ""
+            self.selected_zone_cost = "0,00"
+        self._refresh_cart_total()
+
+    def select_zone(self, zone_id: int) -> None:
+        selected = next((zone for zone in self.zones if str(zone["id"]) == str(zone_id)), {})
+        self.zona_envio_id = str(zone_id)
+        self.selected_zone_name = selected.get("nombre", "")
+        self.selected_zone_cost = selected.get("costo_display", "0,00")
+        self._refresh_cart_total()
+
+    def set_forma_pago(self, value: str) -> None:
+        self.forma_pago = value
+
+    def submit_order(self) -> rx.event.EventSpec | None:
+        try:
+            if not self.cart:
+                raise ValueError("Tu pedido esta vacio.")
+            delivery_date = _parse_delivery_date(self.fecha_entrega)
+            _validate_time(self.horario_entrega)
+            if self.delivery_mode == "delivery" and not self.zona_envio_id:
+                raise ValueError("Selecciona una zona de envio.")
+            items = [
+                OrderItemInput(
+                    producto_id=int(item["producto_id"]),
+                    cantidad=int(item["cantidad"]),
+                )
+                for item in self.cart
+            ]
             payload = PublicOrderInput(
                 nombre_apellido=self.nombre_apellido,
                 telefono=self.telefono,
-                fecha_entrega=date.fromisoformat(self.fecha_entrega),
-                direccion_delivery=self.direccion_delivery,
-                zona_envio_id=int(self.zona_envio_id) if self.zona_envio_id else None,
+                fecha_entrega=delivery_date,
+                direccion_delivery=self.direccion_delivery if self.delivery_mode == "delivery" else "Retiro en el local",
+                zona_envio_id=int(self.zona_envio_id) if self.delivery_mode == "delivery" and self.zona_envio_id else None,
                 forma_pago=FormaPago(self.forma_pago),
                 observaciones=self.observaciones or None,
-                items=[item],
+                items=items,
             )
             with Session(engine) as session:
                 result = OrderService(session).create_public_order(payload)
-            extra = f" WhatsApp: {result.whatsapp_url}" if result.whatsapp_url else ""
-            self.message = f"Pedido {result.pedido.codigo} creado. Total: {result.pedido.monto_total}.{extra}"
+            whatsapp_url = self._build_whatsapp_url(result.pedido.codigo, result.pedido.monto_total)
+            self.message = "Pedido creado. Te llevamos a WhatsApp para enviar el resumen."
+            return rx.redirect(whatsapp_url, is_external=True)
         except Exception as exc:
             self.message = str(exc)
+            return None
+
+    def _refresh_cart_total(self) -> None:
+        cart = [dict(item) for item in self.cart]
+        if cart:
+            try:
+                inputs = [
+                    OrderItemInput(producto_id=int(item["producto_id"]), cantidad=int(item["cantidad"]))
+                    for item in cart
+                ]
+                with Session(engine) as session:
+                    priced_items = OrderService(session)._price_items(inputs)
+                for cart_item, priced_item in zip(cart, priced_items):
+                    base_unit = Decimal(str(cart_item["precio"]))
+                    final_unit = Decimal(str(priced_item.precio_unitario))
+                    quantity = Decimal(str(cart_item["cantidad"]))
+                    base_subtotal = base_unit * quantity
+                    subtotal = final_unit * quantity
+                    discount = base_subtotal - subtotal
+                    cart_item["precio_final"] = str(final_unit)
+                    cart_item["subtotal"] = str(subtotal)
+                    cart_item["subtotal_display"] = _money_text(subtotal)
+                    cart_item["base_subtotal_display"] = _money_text(base_subtotal)
+                    cart_item["discount"] = str(discount)
+                    cart_item["discount_display"] = _money_text(discount)
+                    cart_item["promo_label"] = (
+                        f"Promo aplicada: $-{_money_text(discount)}" if discount > 0 else ""
+                    )
+            except Exception:
+                for cart_item in cart:
+                    subtotal = Decimal(str(cart_item["precio"])) * Decimal(str(cart_item["cantidad"]))
+                    cart_item["subtotal"] = str(subtotal)
+                    cart_item["subtotal_display"] = _money_text(subtotal)
+                    cart_item["base_subtotal_display"] = _money_text(subtotal)
+                    cart_item["discount"] = "0.00"
+                    cart_item["discount_display"] = "0,00"
+                    cart_item["promo_label"] = ""
+
+        items_total = sum((Decimal(str(item["subtotal"])) for item in cart), Decimal("0.00"))
+        shipping = self._selected_shipping_cost()
+        order_total = items_total + shipping
+        self.cart = cart
+        self.cart_total = str(items_total.quantize(MONEY_QUANT))
+        self.cart_total_display = _money_text(items_total)
+        self.order_total_display = _money_text(order_total)
+
+    def _selected_shipping_cost(self) -> Decimal:
+        if self.delivery_mode != "delivery" or not self.zona_envio_id:
+            return Decimal("0.00")
+        selected = next((zone for zone in self.zones if str(zone["id"]) == self.zona_envio_id), None)
+        return Decimal(str(selected["costo"])) if selected else Decimal("0.00")
+
+    def _build_whatsapp_url(self, pedido_codigo: str, total: Decimal) -> str:
+        now = datetime.now(ZoneInfo("America/Argentina/Buenos_Aires")).strftime("%d/%m/%y - %H:%Mhs")
+        delivery_label = "Delivery" if self.delivery_mode == "delivery" else "Retiro del local"
+        lines = [
+            "¡Hola! Te paso el resumen de mi pedido",
+            "",
+            f"Pedido: #{pedido_codigo}",
+            f"Tienda: {STORE_NAME}",
+            f"Fecha: {now}",
+            f"Nombre: {self.nombre_apellido}",
+                f"Telefono: {self.telefono}",
+                f"Horario ideal de entrega: {self.horario_entrega}hs",
+                "",
+                f"Forma de pago: {'Transferencia' if self.forma_pago == FormaPago.TRANSFERENCIA.value else 'Efectivo'}",
+        ]
+        if self.forma_pago == FormaPago.TRANSFERENCIA.value:
+            lines.extend(
+                [
+                    "",
+                    "Datos para la transferencia",
+                    f"Titular: {TRANSFER_TITULAR}",
+                    f"Alias: {TRANSFER_ALIAS}",
+                    "Realiza la transferencia y luego envianos el comprobante por este chat.",
+                    "Esperar confirmacion antes de transferir.",
+                ]
+            )
+        lines.extend(
+            [
+                "",
+                f"Total: ${_money_text(total)}",
+                "",
+                f"Entrega: {delivery_label}",
+            ]
+        )
+        if self.delivery_mode == "delivery":
+            lines.append(f"Direccion: {self.direccion_delivery}")
+            lines.append(f"Zona: {self.selected_zone_name}")
+        if self.observaciones:
+            lines.append(f"Referencia/observaciones: {self.observaciones}")
+        lines.extend(["", "Mi pedido es", ""])
+        categories = []
+        for item in self.cart:
+            category = item.get("categoria", "Productos")
+            if category not in categories:
+                categories.append(category)
+        for category in categories:
+            lines.append(f"{category.upper()} ({category.upper()})")
+            for item in self.cart:
+                if item.get("categoria", "Productos") != category:
+                    continue
+                lines.append(
+                    f"{item['cantidad']}x {item['nombre']}: ${item['subtotal_display']}"
+                )
+                if item.get("promo_label"):
+                    lines.append(item["promo_label"])
+        lines.extend(
+            [
+                "",
+                f"Subtotal: ${self.cart_total_display}",
+                f"Costo de envio: +${self.selected_zone_cost if self.delivery_mode == 'delivery' else '0,00'}",
+                f"TOTAL: ${_money_text(total)}",
+                "",
+                "Espero tu respuesta para confirmar mi pedido",
+            ]
+        )
+        phone = "".join(char for char in PIZZERIA_WHATSAPP_PHONE if char.isdigit())
+        target = f"https://wa.me/{phone}" if phone else "https://wa.me/"
+        return f"{target}?text={quote(chr(10).join(lines))}"
 
 
 class OperationsState(rx.State):
@@ -174,7 +484,7 @@ class OperationsState(rx.State):
 
     async def transition(self, pedido_id: int, next_state: str) -> None:
         auth = await self.get_state(AuthState)
-        if not auth.is_authenticated:
+        if not auth.user_id:
             self.message = "Inicia sesion para operar pedidos."
             return
         try:
@@ -218,7 +528,7 @@ class ExpenseState(rx.State):
 
     async def submit_expense(self) -> None:
         auth = await self.get_state(AuthState)
-        if not auth.is_authenticated:
+        if not auth.user_id:
             self.message = "Inicia sesion para cargar gastos."
             return
         try:
@@ -249,7 +559,7 @@ class AdminCrudState(rx.State):
 
     async def load_records(self) -> None:
         auth = await self.get_state(AuthState)
-        if not auth.is_admin:
+        if auth.role != RolUsuario.ADMIN.value:
             self.message = "Solo Admin puede administrar datos."
             return
         try:
@@ -274,7 +584,7 @@ class AdminCrudState(rx.State):
 
     async def delete_record(self) -> None:
         auth = await self.get_state(AuthState)
-        if not auth.is_admin:
+        if auth.role != RolUsuario.ADMIN.value:
             self.message = "Solo Admin puede borrar datos."
             return
         try:
@@ -287,7 +597,7 @@ class AdminCrudState(rx.State):
 
     async def _save_record(self, *, create: bool) -> None:
         auth = await self.get_state(AuthState)
-        if not auth.is_admin:
+        if auth.role != RolUsuario.ADMIN.value:
             self.message = "Solo Admin puede guardar datos."
             return
         try:
